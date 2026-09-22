@@ -24,11 +24,11 @@ def keep_alive():
 # ==========================================
 # TerminalX999 - Standard License Key Discord Bot
 # ==========================================
-# Keys & Tokens Render Dashboard ke "Environment" tab se fetch honge
 TOKEN    = os.getenv("DISCORD_TOKEN")
-GUILD_ID = int(os.getenv("GUILD_ID", "1525181999147388958"))
+GUILD_ID = os.getenv("GUILD_ID")
 
 API_URL  = "https://auth.terminalx999.online/api_admin.php"
+# Updated API Key automatically assigned
 API_KEY  = os.getenv("API_KEY", "TX999_1fc0134c4c418cf9f0817f355ac10cf7e5f73cf899a83bbf4731e4eec3929870")
 APP_ID   = os.getenv("APP_ID", "9f087d585fbd666572fc24b7")
 
@@ -40,17 +40,17 @@ async def on_ready():
     print(f"Logged in as {bot.user.name} (ID: {bot.user.id})")
     try:
         if GUILD_ID:
-            guild = discord.Object(id=GUILD_ID)
+            guild = discord.Object(id=int(GUILD_ID))
             bot.tree.copy_global_to(guild=guild)
             synced = await bot.tree.sync(guild=guild)
-            print(f"Synced {len(synced)} slash commands to Guild.")
+            print(f"Synced {len(synced)} slash commands to Guild ID: {GUILD_ID}")
         else:
             synced = await bot.tree.sync()
             print(f"Synced {len(synced)} slash commands globally.")
     except Exception as e:
         print(f"Failed to sync commands: {e}")
 
-# ── Button Click Handler (Reset, Ban, Unban, Pause, Unpause) ──
+# ── Button Click Handler ──
 @bot.event
 async def on_interaction(interaction: discord.Interaction):
     if interaction.type == discord.InteractionType.component:
@@ -68,15 +68,17 @@ async def on_interaction(interaction: discord.Interaction):
             except Exception as e:
                 await interaction.followup.send(f"⚠️ Error: {str(e)}", ephemeral=True)
 
-# ── 1. GENERATE KEY COMMAND (LIB BYPASS removed, Note field added) ──
+# ── GENERATE KEY COMMAND ──
 @bot.tree.command(name="genkey", description="Generate a license key remotely.")
 @app_commands.choices(package=[
-    app_commands.Choice(name="BASIC PANEL", value="e52c1515c53453b85d0d4e87"),
-    app_commands.Choice(name="AIMSILENT EXE", value="affc8da8fd5ace99981ab877"),
-    app_commands.Choice(name="UID BYPASS", value="cb921031dc43197e8ccb6828"),
-    app_commands.Choice(name="EXTERNAL PANEL", value="3d1c6c948b4715fbd2fada2d"),
-    app_commands.Choice(name="PVT AIMKILL", value="d4f0ce93349f236711344cb5"),
-    app_commands.Choice(name="VAULT PANEL", value="154d1edaddd7203fbfd847f4")
+    app_commands.Choice(name="BASIC PANEL (v13)", value="e52c1515c53453b85d0d4e87"),
+    app_commands.Choice(name="AIMSILENT EXE (v13)", value="affc8da8fd5ace99981ab877"),
+    app_commands.Choice(name="UID BYPASS (v13)", value="cb921031dc43197e8ccb6828"),
+    app_commands.Choice(name="EXTERNAL PANEL (v13)", value="3d1c6c948b4715fbd2fada2d"),
+    app_commands.Choice(name="PVT AIMKILL (v13)", value="d4f0ce93349f236711344cb5"),
+    app_commands.Choice(name="VAULT PANEL (v13)", value="154d1edaddd7203fbfd847f4"),
+    app_commands.Choice(name="LIB BYPASS (v13)", value="db3b90e8134ec738b94a9b05"),
+    app_commands.Choice(name="FPS BOOSTER (v13)", value="FPS_BOOSTER_PACKAGE_ID_HERE") # Panel se FPS Booster ID daal lein
 ])
 @app_commands.describe(
     package="Select the target package",
@@ -109,21 +111,23 @@ async def genkey(interaction: discord.Interaction, package: app_commands.Choice[
             )
             embed.add_field(name="Keys", value="\n".join([f"`{k}`" for k in keys]), inline=False)
             
-            view = discord.ui.View()
+            # Fix: View parameter bug fixed
             if len(keys) == 1:
+                view = discord.ui.View()
                 view.add_item(discord.ui.Button(label="Reset HWID", custom_id=f"reset_hwid:{keys[0]}", style=discord.ButtonStyle.primary))
                 view.add_item(discord.ui.Button(label="Ban", custom_id=f"ban_key:{keys[0]}", style=discord.ButtonStyle.danger))
                 view.add_item(discord.ui.Button(label="Unban", custom_id=f"unban_key:{keys[0]}", style=discord.ButtonStyle.success))
                 view.add_item(discord.ui.Button(label="Pause", custom_id=f"pause_key:{keys[0]}", style=discord.ButtonStyle.secondary))
                 view.add_item(discord.ui.Button(label="Unpause", custom_id=f"unpause_key:{keys[0]}", style=discord.ButtonStyle.success))
-            
-            await interaction.followup.send(embed=embed, view=view if len(keys) == 1 else None)
+                await interaction.followup.send(embed=embed, view=view)
+            else:
+                await interaction.followup.send(embed=embed)
         else:
             await interaction.followup.send(f"❌ {data.get('message')}", ephemeral=True)
     except Exception as e:
         await interaction.followup.send(f"⚠️ Error: {str(e)}", ephemeral=True)
 
-# Helper Function Direct Commands ke Liye
+# Helper Function
 async def execute_key_action(interaction: discord.Interaction, action: str, key: str):
     await interaction.response.defer(ephemeral=True)
     try:
@@ -136,34 +140,30 @@ async def execute_key_action(interaction: discord.Interaction, action: str, key:
     except Exception as e:
         await interaction.followup.send(f"⚠️ Error: {str(e)}", ephemeral=True)
 
-# ── 2. RESET HWID COMMAND ──
+# ── COMMANDS ──
 @bot.tree.command(name="resetkey", description="Reset HWID for a specific key.")
 async def resetkey(interaction: discord.Interaction, key: str):
     await execute_key_action(interaction, "reset_hwid", key)
 
-# ── 3. BAN KEY COMMAND ──
 @bot.tree.command(name="bankey", description="Ban a specific key.")
 async def bankey(interaction: discord.Interaction, key: str):
     await execute_key_action(interaction, "ban_key", key)
 
-# ── 4. UNBAN KEY COMMAND ──
 @bot.tree.command(name="unbankey", description="Unban a specific key.")
 async def unbankey(interaction: discord.Interaction, key: str):
     await execute_key_action(interaction, "unban_key", key)
 
-# ── 5. PAUSE KEY COMMAND ──
 @bot.tree.command(name="pausekey", description="Pause a specific key.")
 async def pausekey(interaction: discord.Interaction, key: str):
     await execute_key_action(interaction, "pause_key", key)
 
-# ── 6. UNPAUSE KEY COMMAND ──
 @bot.tree.command(name="unpausekey", description="Unpause a specific key.")
 async def unpausekey(interaction: discord.Interaction, key: str):
     await execute_key_action(interaction, "unpause_key", key)
 
-# Keep alive server start aur bot execution
 keep_alive()
+
 if TOKEN:
     bot.run(TOKEN)
 else:
-    print("❌ DISCORD_TOKEN Environment Variable missing! Render settings check karein.")
+    print("❌ ERROR: DISCORD_TOKEN Environment Variable missing!")
