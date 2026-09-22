@@ -7,7 +7,7 @@ from discord.ext import commands
 import aiohttp
 
 # ==========================================
-# 1. Render Web Server (Keep Alive)
+# 1. Render Web Server (Port Binding)
 # ==========================================
 web_app = Flask(__name__)
 
@@ -25,7 +25,7 @@ def keep_alive():
     t.start()
 
 # ==========================================
-# 2. TerminalX999 - Async License Bot
+# 2. TerminalX999 - License Bot
 # ==========================================
 TOKEN    = os.getenv("DISCORD_TOKEN")
 
@@ -52,30 +52,39 @@ PACKAGE_NAMES = {
     "2411bc9db9f9a66c6e876ad2": "FPS BOOSTER"
 }
 
-# Non-blocking async API caller
-async def call_license_api_async(action: str, **kwargs):
-    payload = {"api_key": API_KEY, "action": action, **kwargs}
+# Fast API Caller with GET / Form-POST & 5-second hard timeout
+async def call_api(action: str, **kwargs):
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Content-Type": "application/json"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+    }
+    params = {
+        "api_key": API_KEY,
+        "action": action,
+        **kwargs
     }
     try:
-        async with aiohttp.ClientSession() as session:
-            # First try POST JSON
-            async with session.post(API_URL, json=payload, headers=headers, timeout=aiohttp.ClientTimeout(total=12)) as resp:
+        timeout = aiohttp.ClientTimeout(total=5)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            # First try direct GET (Panel allows GET query params)
+            async with session.get(API_URL, params=params, headers=headers) as resp:
                 if resp.status == 200:
                     try:
                         return await resp.json(content_type=None)
                     except Exception:
-                        text_res = await resp.text()
-                        return {"success": False, "message": f"Non-JSON response: {text_res[:100]}"}
+                        txt = await resp.text()
+                        return {"success": False, "message": f"Raw Response: {txt[:120]}"}
                 else:
-                    return {"success": False, "message": f"HTTP Error {resp.status}"}
+                    # If GET fails, fallback to POST Form data
+                    async with session.post(API_URL, data=params, headers=headers) as post_resp:
+                        if post_resp.status == 200:
+                            return await post_resp.json(content_type=None)
+                        return {"success": False, "message": f"Server status code: {post_resp.status}"}
     except asyncio.TimeoutError:
-        return {"success": False, "message": "API Server timed out (12s). Check if domain is reachable."}
+        return {"success": False, "message": "API Connection Timeout (Panel server ne 5 second me reply nahi kiya)."}
     except Exception as e:
-        return {"success": False, "message": str(e)}
+        return {"success": False, "message": f"Request Error: {str(e)}"}
 
+# ── Command Access Check ──
 @bot.tree.interaction_check
 async def is_owner_and_guild(interaction: discord.Interaction) -> bool:
     if interaction.guild_id != GUILD_ID or interaction.user.id != OWNER_ID:
@@ -94,6 +103,7 @@ async def on_ready():
     except Exception as e:
         print(f"Failed to sync commands: {e}")
 
+# ── Button Click Handler ──
 @bot.event
 async def on_interaction(interaction: discord.Interaction):
     if interaction.type == discord.InteractionType.component:
@@ -105,9 +115,9 @@ async def on_interaction(interaction: discord.Interaction):
         if ":" in custom_id:
             action, key = custom_id.split(":", 1)
             await interaction.response.defer(ephemeral=True)
-            data = await call_license_api_async(action=action, key=key)
+            data = await call_api(action=action, key=key)
             if data.get("success"):
-                await interaction.followup.send(f"✓ Action **{action}** completed for key: `{key}`", ephemeral=True)
+                await interaction.followup.send(f"✓ Action **{action}** successfully completed for: `{key}`", ephemeral=True)
             else:
                 await interaction.followup.send(f"❌ Failed: {data.get('message')}", ephemeral=True)
 
@@ -129,10 +139,10 @@ async def on_interaction(interaction: discord.Interaction):
     count="Number of keys to generate (max 100)"
 )
 async def genkey(interaction: discord.Interaction, package: str, days: int = 30, count: int = 1):
-    # Defer immediate response to prevent Discord timeout
+    # Turant thinking state handle karne ke liye defer
     await interaction.response.defer(ephemeral=False)
     
-    data = await call_license_api_async("generate_key", app_id=APP_ID, package_id=package, days=days, count=count)
+    data = await call_api(action="generate_key", app_id=APP_ID, package_id=package, days=days, count=count)
     
     if data.get("success"):
         keys = data.get("data", {}).get("keys", [])
@@ -154,14 +164,15 @@ async def genkey(interaction: discord.Interaction, package: str, days: int = 30,
             
         await interaction.followup.send(embed=embed, view=view if len(keys) == 1 else None)
     else:
-        await interaction.followup.send(f"❌ API Error: {data.get('message')}", ephemeral=True)
+        # Freeze hone ke bajaye seedha screen par error aayega
+        await interaction.followup.send(f"❌ API Panel Error: {data.get('message')}")
 
 # ── Command 2: Reset HWID ──
 @bot.tree.command(name="resethwid", description="Reset device HWID binding for a license key.")
 @discord.app_commands.describe(key="Enter the full license key to reset")
 async def resethwid(interaction: discord.Interaction, key: str):
     await interaction.response.defer(ephemeral=True)
-    data = await call_license_api_async("reset_hwid", key=key.strip())
+    data = await call_api(action="reset_hwid", key=key.strip())
     if data.get("success"):
         await interaction.followup.send(f"🔄 HWID Reset Success for `{key.strip()}`", ephemeral=True)
     else:
@@ -172,7 +183,7 @@ async def resethwid(interaction: discord.Interaction, key: str):
 @discord.app_commands.describe(key="Enter the full license key to ban")
 async def bankey(interaction: discord.Interaction, key: str):
     await interaction.response.defer(ephemeral=True)
-    data = await call_license_api_async("ban_key", key=key.strip())
+    data = await call_api(action="ban_key", key=key.strip())
     if data.get("success"):
         await interaction.followup.send(f"🚫 Key Banned: `{key.strip()}`", ephemeral=True)
     else:
@@ -183,7 +194,7 @@ async def bankey(interaction: discord.Interaction, key: str):
 @discord.app_commands.describe(key="Enter the full license key to unban")
 async def unbankey(interaction: discord.Interaction, key: str):
     await interaction.response.defer(ephemeral=True)
-    data = await call_license_api_async("unban_key", key=key.strip())
+    data = await call_api(action="unban_key", key=key.strip())
     if data.get("success"):
         await interaction.followup.send(f"✅ Key Unbanned: `{key.strip()}`", ephemeral=True)
     else:
@@ -194,7 +205,7 @@ async def unbankey(interaction: discord.Interaction, key: str):
 @discord.app_commands.describe(key="Enter the full license key to delete")
 async def delkey(interaction: discord.Interaction, key: str):
     await interaction.response.defer(ephemeral=True)
-    data = await call_license_api_async("delete_key", key=key.strip())
+    data = await call_api(action="delete_key", key=key.strip())
     if data.get("success"):
         await interaction.followup.send(f"🗑️ Key Deleted: `{key.strip()}`", ephemeral=True)
     else:
