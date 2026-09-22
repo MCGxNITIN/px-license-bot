@@ -24,12 +24,13 @@ def keep_alive():
 # ==========================================
 # TerminalX999 - Standard License Key Discord Bot
 # ==========================================
-TOKEN    = os.getenv("DISCORD_TOKEN")
-GUILD_ID = os.getenv("GUILD_ID")
+TOKEN      = os.getenv("DISCORD_TOKEN")
+GUILD_ID   = os.getenv("GUILD_ID")
 
-API_URL  = "https://auth.terminalx999.online/api_admin.php"
-API_KEY  = os.getenv("API_KEY", "TX999_1fc0134c4c418cf9f0817f355ac10cf7e5f73cf899a83bbf4731e4eec3929870")
-APP_ID   = os.getenv("APP_ID", "9f087d585fbd666572fc24b7")
+API_URL    = "https://auth.terminalx999.online/api_admin.php"
+API_KEY    = "TX999_1fc0134c4c418cf9f0817f355ac10cf7e5f73cf899a83bbf4731e4eec3929870"
+APP_ID     = "9f087d585fbd666572fc24b7"
+APP_SECRET = "4ac5c8b945cbf8c75e15d771704616356c15edc051cbad6c12c92376da1dced7"
 
 intents = discord.Intents.default()
 bot = commands.Bot(command_prefix="!", intents=intents)
@@ -63,7 +64,8 @@ async def on_interaction(interaction: discord.Interaction):
                     "api_key": API_KEY,
                     "action": action,
                     "key": key,
-                    "app_id": APP_ID
+                    "app_id": APP_ID,
+                    "app_secret": APP_SECRET
                 }
                 resp = requests.post(API_URL, json=payload, timeout=10)
                 res_data = resp.json()
@@ -74,7 +76,7 @@ async def on_interaction(interaction: discord.Interaction):
             except Exception as e:
                 await interaction.followup.send(f"⚠️ Error: {str(e)}", ephemeral=True)
 
-# ── GENERATE KEY COMMAND (LIB BYPASS removed, FPS BOOSTER added) ──
+# ── GENERATE KEY COMMAND ──
 @bot.tree.command(name="genkey", description="Generate a license key remotely.")
 @app_commands.choices(package=[
     app_commands.Choice(name="BASIC PANEL (v13)", value="e52c1515c53453b85d0d4e87"),
@@ -96,11 +98,11 @@ async def genkey(interaction: discord.Interaction, package: app_commands.Choice[
     if count < 1:
         count = 1
 
-    # TerminalX999 Admin API Payload Exact Match
     payload = {
         "api_key": API_KEY, 
         "action": "generate_key", 
-        "app_id": APP_ID, 
+        "app_id": APP_ID,
+        "app_secret": APP_SECRET,
         "package_id": package.value, 
         "days": days,
         "amount": count,
@@ -111,7 +113,7 @@ async def genkey(interaction: discord.Interaction, package: app_commands.Choice[
         resp = requests.post(API_URL, json=payload, timeout=10)
         data = resp.json()
         
-        # Parse returned keys safely
+        # Keys Parsing
         keys = []
         if isinstance(data.get("data"), dict):
             keys = data.get("data", {}).get("keys", [])
@@ -122,13 +124,14 @@ async def genkey(interaction: discord.Interaction, package: app_commands.Choice[
             
         if data.get("success") or len(keys) > 0:
             if len(keys) == 0:
-                await interaction.followup.send("❌ Key generation failed: Panel returned 0 keys.", ephemeral=True)
+                msg = data.get("message", "Panel returned 0 keys.")
+                await interaction.followup.send(f"❌ Key generation failed: {msg}", ephemeral=True)
                 return
 
             dur = "Lifetime" if days == 0 else f"{days} Days"
             pkg_display_name = package.name.replace(" (v13)", "")
             
-            # Exact Embed Layout Matching Image
+            # Layout Embed matching exact UI
             embed = discord.Embed(
                 title="🔑 Package License Key Generated", 
                 color=0x22c55e
@@ -138,7 +141,7 @@ async def genkey(interaction: discord.Interaction, package: app_commands.Choice[
             embed.add_field(name="Count", value=str(len(keys)), inline=True)
             embed.add_field(name="Keys", value="\n".join([f"`{k}`" for k in keys]), inline=False)
             
-            # Exact Action Buttons
+            # Action Buttons
             if len(keys) == 1:
                 view = discord.ui.View()
                 view.add_item(discord.ui.Button(label="Reset HWID", custom_id=f"reset_hwid:{keys[0]}", style=discord.ButtonStyle.primary))
@@ -154,7 +157,7 @@ async def genkey(interaction: discord.Interaction, package: app_commands.Choice[
     except Exception as e:
         await interaction.followup.send(f"⚠️ Error: {str(e)}", ephemeral=True)
 
-# Helper Function Direct Commands Ke Liye
+# Helper Function Direct Commands
 async def execute_key_action(interaction: discord.Interaction, action: str, key: str):
     await interaction.response.defer(ephemeral=True)
     try:
@@ -162,7 +165,8 @@ async def execute_key_action(interaction: discord.Interaction, action: str, key:
             "api_key": API_KEY,
             "action": action,
             "key": key,
-            "app_id": APP_ID
+            "app_id": APP_ID,
+            "app_secret": APP_SECRET
         }
         resp = requests.post(API_URL, json=payload, timeout=10)
         data = resp.json()
