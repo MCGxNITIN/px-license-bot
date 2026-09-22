@@ -6,7 +6,7 @@ from discord.ext import commands
 import requests
 
 # ==========================================
-# 1. Render Keep-Alive Web Server (Flask)
+# 1. Render Web Server (Keep Alive)
 # ==========================================
 web_app = Flask(__name__)
 
@@ -18,22 +18,24 @@ def run_web():
     port = int(os.environ.get("PORT", 8080))
     web_app.run(host="0.0.0.0", port=port)
 
-# Background thread me web server start karna
 def keep_alive():
     t = threading.Thread(target=run_web)
     t.daemon = True
     t.start()
 
 # ==========================================
-# 2. TerminalX999 - Owner Discord Bot
+# 2. TerminalX999 - Owner Only Bot Configuration
 # ==========================================
 TOKEN    = os.getenv("DISCORD_TOKEN")
-GUILD_ID = 1525181999147388958
-OWNER_ID = 1525179499602509977
+
+GUILD_ID = 1525181999147388958   # Aapka Server ID
+OWNER_ID = 1525179499602509977   # Aapka User ID
 
 API_URL  = "https://auth.terminalx999.online/api_admin.php"
 API_KEY  = "TX999_1fc0134c4c418cf9f0817f355ac10cf7e5f73cf899a83bbf4731e4eec3929870"
 APP_ID   = "9f087d585fbd666572fc24b7"
+
+DENIED_MESSAGE = "⛔ Access Denied: For use contact Super Admin PERSISTX !"
 
 intents = discord.Intents.default()
 bot = commands.Bot(command_prefix="!", intents=intents)
@@ -57,13 +59,11 @@ def call_license_api(action: str, **kwargs):
     except Exception as e:
         return {"success": False, "message": str(e)}
 
+# ── Command Access Security Check ──
 @bot.tree.interaction_check
 async def is_owner_and_guild(interaction: discord.Interaction) -> bool:
-    if interaction.guild_id != GUILD_ID:
-        await interaction.response.send_message("❌ Unauthorized Server.", ephemeral=True)
-        return False
-    if interaction.user.id != OWNER_ID:
-        await interaction.response.send_message("⛔ Access Denied: Sirf bot owner run kar sakta hai.", ephemeral=True)
+    if interaction.guild_id != GUILD_ID or interaction.user.id != OWNER_ID:
+        await interaction.response.send_message(DENIED_MESSAGE, ephemeral=True)
         return False
     return True
 
@@ -74,15 +74,17 @@ async def on_ready():
         guild = discord.Object(id=GUILD_ID)
         bot.tree.copy_global_to(guild=guild)
         synced = await bot.tree.sync(guild=guild)
-        print(f"Synced {len(synced)} slash commands.")
+        print(f"Synced {len(synced)} slash commands directly to Guild {GUILD_ID}.")
     except Exception as e:
         print(f"Failed to sync commands: {e}")
 
+# ── Button Click Handler ──
 @bot.event
 async def on_interaction(interaction: discord.Interaction):
     if interaction.type == discord.InteractionType.component:
+        # Button security check
         if interaction.guild_id != GUILD_ID or interaction.user.id != OWNER_ID:
-            await interaction.response.send_message("⛔ Access Denied.", ephemeral=True)
+            await interaction.response.send_message(DENIED_MESSAGE, ephemeral=True)
             return
 
         custom_id = interaction.data.get("custom_id", "")
@@ -91,10 +93,11 @@ async def on_interaction(interaction: discord.Interaction):
             await interaction.response.defer(ephemeral=True)
             data = call_license_api(action=action, key=key)
             if data.get("success"):
-                await interaction.followup.send(f"✓ Action **{action}** successfully completed for: `{key}`", ephemeral=True)
+                await interaction.followup.send(f"✓ Action **{action}** successfully completed for key: `{key}`", ephemeral=True)
             else:
                 await interaction.followup.send(f"❌ Failed: {data.get('message')}", ephemeral=True)
 
+# ── Command 1: Generate Key ──
 @bot.tree.command(name="genkey", description="Generate a license key remotely.")
 @discord.app_commands.choices(package=[
     discord.app_commands.Choice(name="BASIC PANEL", value="e52c1515c53453b85d0d4e87"),
@@ -106,7 +109,11 @@ async def on_interaction(interaction: discord.Interaction):
     discord.app_commands.Choice(name="LIB BYPASS", value="db3b90e8134ec738b94a9b05"),
     discord.app_commands.Choice(name="FPS BOOSTER", value="2411bc9db9f9a66c6e876ad2")
 ])
-@discord.app_commands.describe(package="Select package", days="Duration (0 = lifetime)", count="Number of keys (max 100)")
+@discord.app_commands.describe(
+    package="Select the target package",
+    days="Number of validity days (0 = lifetime)",
+    count="Number of keys to generate (max 100)"
+)
 async def genkey(interaction: discord.Interaction, package: str, days: int = 30, count: int = 1):
     await interaction.response.defer(ephemeral=False)
     data = call_license_api("generate_key", app_id=APP_ID, package_id=package, days=days, count=count)
@@ -132,7 +139,9 @@ async def genkey(interaction: discord.Interaction, package: str, days: int = 30,
     else:
         await interaction.followup.send(f"❌ {data.get('message')}", ephemeral=True)
 
+# ── Command 2: Reset HWID ──
 @bot.tree.command(name="resethwid", description="Reset device HWID binding for a license key.")
+@discord.app_commands.describe(key="Enter the full license key to reset")
 async def resethwid(interaction: discord.Interaction, key: str):
     await interaction.response.defer(ephemeral=True)
     data = call_license_api("reset_hwid", key=key.strip())
@@ -141,7 +150,9 @@ async def resethwid(interaction: discord.Interaction, key: str):
     else:
         await interaction.followup.send(f"❌ Failed: {data.get('message')}", ephemeral=True)
 
+# ── Command 3: Ban Key ──
 @bot.tree.command(name="bankey", description="Ban a license key.")
+@discord.app_commands.describe(key="Enter the full license key to ban")
 async def bankey(interaction: discord.Interaction, key: str):
     await interaction.response.defer(ephemeral=True)
     data = call_license_api("ban_key", key=key.strip())
@@ -150,7 +161,9 @@ async def bankey(interaction: discord.Interaction, key: str):
     else:
         await interaction.followup.send(f"❌ Failed: {data.get('message')}", ephemeral=True)
 
+# ── Command 4: Unban Key ──
 @bot.tree.command(name="unbankey", description="Unban a previously banned license key.")
+@discord.app_commands.describe(key="Enter the full license key to unban")
 async def unbankey(interaction: discord.Interaction, key: str):
     await interaction.response.defer(ephemeral=True)
     data = call_license_api("unban_key", key=key.strip())
@@ -159,7 +172,9 @@ async def unbankey(interaction: discord.Interaction, key: str):
     else:
         await interaction.followup.send(f"❌ Failed: {data.get('message')}", ephemeral=True)
 
+# ── Command 5: Delete Key ──
 @bot.tree.command(name="delkey", description="Permanently delete a license key from the database.")
+@discord.app_commands.describe(key="Enter the full license key to delete")
 async def delkey(interaction: discord.Interaction, key: str):
     await interaction.response.defer(ephemeral=True)
     data = call_license_api("delete_key", key=key.strip())
@@ -169,5 +184,5 @@ async def delkey(interaction: discord.Interaction, key: str):
         await interaction.followup.send(f"❌ Failed: {data.get('message')}", ephemeral=True)
 
 if __name__ == "__main__":
-    keep_alive()       # Render port binding ke liye web server start karega
-    bot.run(TOKEN)     # Discord bot start karega
+    keep_alive()
+    bot.run(TOKEN)
