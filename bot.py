@@ -50,7 +50,7 @@ async def on_ready():
     except Exception as e:
         print(f"Failed to sync commands: {e}")
 
-# ── Button Click Handler ──
+# ── Button Click Handler (Reset HWID, Ban, Unban, Delete) ──
 @bot.event
 async def on_interaction(interaction: discord.Interaction):
     if interaction.type == discord.InteractionType.component:
@@ -59,16 +59,22 @@ async def on_interaction(interaction: discord.Interaction):
             action, key = custom_id.split(":", 1)
             await interaction.response.defer(ephemeral=True)
             try:
-                resp = requests.post(API_URL, json={"api_key": API_KEY, "action": action, "key": key}, timeout=10)
+                payload = {
+                    "api_key": API_KEY,
+                    "action": action,
+                    "key": key,
+                    "app_id": APP_ID
+                }
+                resp = requests.post(API_URL, json=payload, timeout=10)
                 res_data = resp.json()
                 if res_data.get("success"):
                     await interaction.followup.send(f"✓ Action **{action}** completed for key: `{key}`", ephemeral=True)
                 else:
-                    await interaction.followup.send(f"❌ Failed: {res_data.get('message')}", ephemeral=True)
+                    await interaction.followup.send(f"❌ Failed: {res_data.get('message', 'Unknown error')}", ephemeral=True)
             except Exception as e:
                 await interaction.followup.send(f"⚠️ Error: {str(e)}", ephemeral=True)
 
-# ── GENERATE KEY COMMAND ──
+# ── GENERATE KEY COMMAND (LIB BYPASS removed, FPS BOOSTER added) ──
 @bot.tree.command(name="genkey", description="Generate a license key remotely.")
 @app_commands.choices(package=[
     app_commands.Choice(name="BASIC PANEL (v13)", value="e52c1515c53453b85d0d4e87"),
@@ -87,14 +93,17 @@ async def on_interaction(interaction: discord.Interaction):
 async def genkey(interaction: discord.Interaction, package: app_commands.Choice[str], days: int = 30, count: int = 1):
     await interaction.response.defer(ephemeral=False)
     
-    # Payload format updated for API compatibility
+    if count < 1:
+        count = 1
+
+    # TerminalX999 Admin API Payload Exact Match
     payload = {
         "api_key": API_KEY, 
         "action": "generate_key", 
         "app_id": APP_ID, 
         "package_id": package.value, 
-        "days": str(days), 
-        "amount": str(count),
+        "days": days,
+        "amount": count,
         "count": count
     }
     
@@ -102,7 +111,7 @@ async def genkey(interaction: discord.Interaction, package: app_commands.Choice[
         resp = requests.post(API_URL, json=payload, timeout=10)
         data = resp.json()
         
-        # Keys Extraction Logic Updated
+        # Parse returned keys safely
         keys = []
         if isinstance(data.get("data"), dict):
             keys = data.get("data", {}).get("keys", [])
@@ -111,15 +120,15 @@ async def genkey(interaction: discord.Interaction, package: app_commands.Choice[
         elif isinstance(data.get("key"), str):
             keys = [data.get("key")]
             
-        if data.get("success") or keys:
-            if not keys:
-                msg = data.get("message", "Panel returned 0 keys.")
-                await interaction.followup.send(f"❌ Key generation failed: {msg}", ephemeral=True)
+        if data.get("success") or len(keys) > 0:
+            if len(keys) == 0:
+                await interaction.followup.send("❌ Key generation failed: Panel returned 0 keys.", ephemeral=True)
                 return
 
             dur = "Lifetime" if days == 0 else f"{days} Days"
             pkg_display_name = package.name.replace(" (v13)", "")
             
+            # Exact Embed Layout Matching Image
             embed = discord.Embed(
                 title="🔑 Package License Key Generated", 
                 color=0x22c55e
@@ -129,6 +138,7 @@ async def genkey(interaction: discord.Interaction, package: app_commands.Choice[
             embed.add_field(name="Count", value=str(len(keys)), inline=True)
             embed.add_field(name="Keys", value="\n".join([f"`{k}`" for k in keys]), inline=False)
             
+            # Exact Action Buttons
             if len(keys) == 1:
                 view = discord.ui.View()
                 view.add_item(discord.ui.Button(label="Reset HWID", custom_id=f"reset_hwid:{keys[0]}", style=discord.ButtonStyle.primary))
@@ -139,7 +149,8 @@ async def genkey(interaction: discord.Interaction, package: app_commands.Choice[
             else:
                 await interaction.followup.send(embed=embed)
         else:
-            await interaction.followup.send(f"❌ {data.get('message', 'Key generation failed')}", ephemeral=True)
+            msg = data.get("message", "Key generation failed.")
+            await interaction.followup.send(f"❌ {msg}", ephemeral=True)
     except Exception as e:
         await interaction.followup.send(f"⚠️ Error: {str(e)}", ephemeral=True)
 
@@ -147,12 +158,18 @@ async def genkey(interaction: discord.Interaction, package: app_commands.Choice[
 async def execute_key_action(interaction: discord.Interaction, action: str, key: str):
     await interaction.response.defer(ephemeral=True)
     try:
-        resp = requests.post(API_URL, json={"api_key": API_KEY, "action": action, "key": key}, timeout=10)
+        payload = {
+            "api_key": API_KEY,
+            "action": action,
+            "key": key,
+            "app_id": APP_ID
+        }
+        resp = requests.post(API_URL, json=payload, timeout=10)
         data = resp.json()
         if data.get("success"):
             await interaction.followup.send(f"✅ Success: Key `{key}` action **{action}** completed.", ephemeral=True)
         else:
-            await interaction.followup.send(f"❌ Failed: {data.get('message')}", ephemeral=True)
+            await interaction.followup.send(f"❌ Failed: {data.get('message', 'Action failed')}", ephemeral=True)
     except Exception as e:
         await interaction.followup.send(f"⚠️ Error: {str(e)}", ephemeral=True)
 
