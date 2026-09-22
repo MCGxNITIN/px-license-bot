@@ -35,19 +35,24 @@ APP_SECRET = "4ac5c8b945cbf8c75e15d771704616356c15edc051cbad6c12c92376da1dced7"
 intents = discord.Intents.default()
 bot = commands.Bot(command_prefix="!", intents=intents)
 
+# ── AUTO CLEAR DUPLICATE COMMANDS ──
 @bot.event
 async def on_ready():
     print(f"Logged in as {bot.user.name} (ID: {bot.user.id})")
     try:
         if GUILD_ID:
             guild = discord.Object(id=int(GUILD_ID))
+            # Global commands aur Purane Guild commands dono saaf karo
+            bot.tree.clear_commands(guild=None)
+            await bot.tree.sync(guild=None)
+            
             bot.tree.clear_commands(guild=guild)
             bot.tree.copy_global_to(guild=guild)
             synced = await bot.tree.sync(guild=guild)
-            print(f"Synced {len(synced)} slash commands to Guild ID: {GUILD_ID}")
+            print(f"Cleared duplicates & synced {len(synced)} single commands to Guild ID: {GUILD_ID}")
         else:
             synced = await bot.tree.sync()
-            print(f"Synced {len(synced)} slash commands globally.")
+            print(f"Cleared duplicates & synced {len(synced)} single commands globally.")
     except Exception as e:
         print(f"Failed to sync commands: {e}")
 
