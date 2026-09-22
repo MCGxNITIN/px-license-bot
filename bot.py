@@ -50,7 +50,7 @@ async def on_ready():
     except Exception as e:
         print(f"Failed to sync commands: {e}")
 
-# ── Button Click Handler (Reset HWID, Ban, Unban, Delete) ──
+# ── Button Click Handler ──
 @bot.event
 async def on_interaction(interaction: discord.Interaction):
     if interaction.type == discord.InteractionType.component:
@@ -87,15 +87,14 @@ async def on_interaction(interaction: discord.Interaction):
 async def genkey(interaction: discord.Interaction, package: app_commands.Choice[str], days: int = 30, count: int = 1):
     await interaction.response.defer(ephemeral=False)
     
-    if count < 1:
-        count = 1
-
+    # Payload format updated for API compatibility
     payload = {
         "api_key": API_KEY, 
         "action": "generate_key", 
         "app_id": APP_ID, 
         "package_id": package.value, 
-        "days": days, 
+        "days": str(days), 
+        "amount": str(count),
         "count": count
     }
     
@@ -103,17 +102,24 @@ async def genkey(interaction: discord.Interaction, package: app_commands.Choice[
         resp = requests.post(API_URL, json=payload, timeout=10)
         data = resp.json()
         
-        if data.get("success"):
+        # Keys Extraction Logic Updated
+        keys = []
+        if isinstance(data.get("data"), dict):
             keys = data.get("data", {}).get("keys", [])
+        elif isinstance(data.get("keys"), list):
+            keys = data.get("keys")
+        elif isinstance(data.get("key"), str):
+            keys = [data.get("key")]
             
+        if data.get("success") or keys:
             if not keys:
-                await interaction.followup.send("❌ Key generation failed: Panel returned 0 keys.", ephemeral=True)
+                msg = data.get("message", "Panel returned 0 keys.")
+                await interaction.followup.send(f"❌ Key generation failed: {msg}", ephemeral=True)
                 return
 
             dur = "Lifetime" if days == 0 else f"{days} Days"
             pkg_display_name = package.name.replace(" (v13)", "")
             
-            # Exact Embed UI Matching Image
             embed = discord.Embed(
                 title="🔑 Package License Key Generated", 
                 color=0x22c55e
@@ -123,7 +129,6 @@ async def genkey(interaction: discord.Interaction, package: app_commands.Choice[
             embed.add_field(name="Count", value=str(len(keys)), inline=True)
             embed.add_field(name="Keys", value="\n".join([f"`{k}`" for k in keys]), inline=False)
             
-            # Exact Buttons Matching Image: Reset HWID, Ban, Unban, Delete
             if len(keys) == 1:
                 view = discord.ui.View()
                 view.add_item(discord.ui.Button(label="Reset HWID", custom_id=f"reset_hwid:{keys[0]}", style=discord.ButtonStyle.primary))
@@ -134,7 +139,7 @@ async def genkey(interaction: discord.Interaction, package: app_commands.Choice[
             else:
                 await interaction.followup.send(embed=embed)
         else:
-            await interaction.followup.send(f"❌ {data.get('message')}", ephemeral=True)
+            await interaction.followup.send(f"❌ {data.get('message', 'Key generation failed')}", ephemeral=True)
     except Exception as e:
         await interaction.followup.send(f"⚠️ Error: {str(e)}", ephemeral=True)
 
