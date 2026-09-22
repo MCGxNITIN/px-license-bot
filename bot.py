@@ -1,17 +1,35 @@
 import os
+import threading
+from flask import Flask
 import discord
 from discord.ext import commands
 import requests
 
 # ==========================================
-# TerminalX999 - Secure Owner-Only License Bot
+# 1. Render Keep-Alive Web Server (Flask)
 # ==========================================
+web_app = Flask(__name__)
 
-# Token seedha hosting panel ke Environment Variables se load hoga
+@web_app.route('/')
+def home():
+    return "Bot is alive and running 24/7!", 200
+
+def run_web():
+    port = int(os.environ.get("PORT", 8080))
+    web_app.run(host="0.0.0.0", port=port)
+
+# Background thread me web server start karna
+def keep_alive():
+    t = threading.Thread(target=run_web)
+    t.daemon = True
+    t.start()
+
+# ==========================================
+# 2. TerminalX999 - Owner Discord Bot
+# ==========================================
 TOKEN    = os.getenv("DISCORD_TOKEN")
-
-GUILD_ID = 1525181999147388958   # Aapka Server ID
-OWNER_ID = 1525179499602509977   # Aapka User ID
+GUILD_ID = 1525181999147388958
+OWNER_ID = 1525179499602509977
 
 API_URL  = "https://auth.terminalx999.online/api_admin.php"
 API_KEY  = "TX999_1fc0134c4c418cf9f0817f355ac10cf7e5f73cf899a83bbf4731e4eec3929870"
@@ -45,7 +63,7 @@ async def is_owner_and_guild(interaction: discord.Interaction) -> bool:
         await interaction.response.send_message("❌ Unauthorized Server.", ephemeral=True)
         return False
     if interaction.user.id != OWNER_ID:
-        await interaction.response.send_message("⛔ Access Denied: Sirf Bot Owner use kar sakta hai.", ephemeral=True)
+        await interaction.response.send_message("⛔ Access Denied: Sirf bot owner run kar sakta hai.", ephemeral=True)
         return False
     return True
 
@@ -73,7 +91,7 @@ async def on_interaction(interaction: discord.Interaction):
             await interaction.response.defer(ephemeral=True)
             data = call_license_api(action=action, key=key)
             if data.get("success"):
-                await interaction.followup.send(f"✓ Action **{action}** successfully completed for key: `{key}`", ephemeral=True)
+                await interaction.followup.send(f"✓ Action **{action}** successfully completed for: `{key}`", ephemeral=True)
             else:
                 await interaction.followup.send(f"❌ Failed: {data.get('message')}", ephemeral=True)
 
@@ -150,4 +168,6 @@ async def delkey(interaction: discord.Interaction, key: str):
     else:
         await interaction.followup.send(f"❌ Failed: {data.get('message')}", ephemeral=True)
 
-bot.run(TOKEN)
+if __name__ == "__main__":
+    keep_alive()       # Render port binding ke liye web server start karega
+    bot.run(TOKEN)     # Discord bot start karega
