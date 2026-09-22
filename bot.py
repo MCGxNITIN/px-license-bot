@@ -85,7 +85,7 @@ async def on_interaction(interaction: discord.Interaction):
     app_commands.Choice(name="EXTERNAL PANEL (v13)", value="3d1c6c948b4715fbd2fada2d"),
     app_commands.Choice(name="PVT AIMKILL (v13)", value="d4f0ce93349f236711344cb5"),
     app_commands.Choice(name="VAULT PANEL (v13)", value="154d1edaddd7203fbfd847f4"),
-    app_commands.Choice(name="FPS BOOSTER (v13)", value="FPS_BOOSTER_PACKAGE_ID_HERE")
+    app_commands.Choice(name="FPS BOOSTER (v13)", value="2411bc9db9f9a66c6e876ad2")
 ])
 @app_commands.describe(
     package="Select the target package",
@@ -131,7 +131,7 @@ async def genkey(interaction: discord.Interaction, package: app_commands.Choice[
             dur = "Lifetime" if days == 0 else f"{days} Days"
             pkg_display_name = package.name.replace(" (v13)", "")
             
-            # Layout Embed matching exact UI
+            # Layout Embed
             embed = discord.Embed(
                 title="🔑 Package License Key Generated", 
                 color=0x22c55e
