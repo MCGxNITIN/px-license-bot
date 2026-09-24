@@ -27,10 +27,10 @@ def keep_alive():
 TOKEN      = os.getenv("DISCORD_TOKEN")
 GUILD_ID   = os.getenv("GUILD_ID")
 
-API_URL    = "https://auth.terminalx999.online/api_admin.php"
+API_URL    = "https://prtvshow.online/api_admin.php"
 API_KEY    = "TX999_1fc0134c4c418cf9f0817f355ac10cf7e5f73cf899a83bbf4731e4eec3929870"
 APP_ID     = "9f087d585fbd666572fc24b7"
-APP_SECRET = "4ac5c8b945cbf8c75e15d771704616356c15edc051cbad6c12c92376da1dced7"
+APP_SECRET = "4ac5c8b945cbf8c75e15d771704616356c15edc061cbad6c12c92376da1dced7"
 
 intents = discord.Intents.default()
 bot = commands.Bot(command_prefix="!", intents=intents)
